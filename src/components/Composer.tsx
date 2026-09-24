@@ -1,4 +1,4 @@
-import { useLayoutEffect, useState, type FormEvent, type KeyboardEvent, type RefObject } from 'react';
+import { useLayoutEffect, useState, type FormEvent, type KeyboardEvent, type MouseEvent, type RefObject } from 'react';
 import { LIMITS } from '../../shared/protocol.ts';
 
 interface Props {
@@ -20,6 +20,13 @@ export function Composer({ isStreaming, onSend, onStop, canSend: online, inputRe
     el.style.height = 'auto';
     el.style.height = `${el.scrollHeight}px`;
   }, [text, inputRef]);
+
+  // «Отправить» и «Стоп» — одна кнопка. Второй клик двойного клика (detail ≥ 2)
+  // иначе сразу остановил бы только что отправленный ответ. Одиночный клик,
+  // Enter/пробел на кнопке (detail = 0) и Esc работают как обычно.
+  const stopByClick = (e: MouseEvent<HTMLButtonElement>) => {
+    if (e.detail < 2) onStop();
+  };
 
   const submit = (e?: FormEvent) => {
     e?.preventDefault();
@@ -66,7 +73,7 @@ export function Composer({ isStreaming, onSend, onStop, canSend: online, inputRe
         <button
           type={isStreaming ? 'button' : 'submit'}
           className={`btn composer-btn ${isStreaming ? 'btn--stop' : 'btn--primary'}`}
-          onClick={isStreaming ? onStop : undefined}
+          onClick={isStreaming ? stopByClick : undefined}
           disabled={!isStreaming && !canSend}
           aria-keyshortcuts={isStreaming ? 'Escape' : undefined}
         >

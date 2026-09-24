@@ -74,36 +74,40 @@ export function useChat() {
         patch(assistantId, (m) => ({ ...m, content: m.content + text }));
       };
 
-      let final: { status: Message['status']; error?: ErrorPayload } | null = null;
+      let final: Pick<Message, 'status' | 'error' | 'finishReason' | 'retryAt'> | null = null;
+      const fail = (error: ErrorPayload): NonNullable<typeof final> => ({
+        status: 'error',
+        error,
+        retryAt: error.retryAfter ? Date.now() + error.retryAfter * 1000 : undefined,
+      });
       try {
         for await (const event of streamChat(toDTO(history), controller.signal)) {
           if (event.type === 'delta') {
             pending += event.text;
             if (!frame) frame = requestAnimationFrame(flush);
+          } else if (event.type === 'thinking') {
+            patch(assistantId, (m) => (m.thinking ? m : { ...m, thinking: true }));
           } else if (event.type === 'meta') {
             patch(assistantId, (m) => ({ ...m, model: event.model }));
           } else if (event.type === 'done') {
-            final = { status: 'done' };
+            final = { status: 'done', finishReason: event.finishReason };
           } else if (event.type === 'error') {
             const { type: _type, ...error } = event;
-            final = { status: 'error', error };
+            final = fail(error);
           }
         }
-        final ??= {
-          status: 'error',
-          error: { code: 'network', message: 'Ответ оборвался, не дойдя до конца.' },
-        };
+        final ??= fail({ code: 'network', message: 'Ответ оборвался, не дойдя до конца.' });
       } catch (err) {
         const reason = controller.signal.reason as AbortReason | undefined;
         if (controller.signal.aborted && reason === 'offline') {
-          final = { status: 'error', error: { code: 'network', message: 'Пропало подключение к интернету.' } };
+          final = fail({ code: 'network', message: 'Пропало подключение к интернету.' });
         } else if (controller.signal.aborted) {
           final = { status: 'stopped' };
         } else if (err instanceof ChatError) {
-          final = { status: 'error', error: err.payload };
+          final = fail(err.payload);
         } else {
           console.error(err);
-          final = { status: 'error', error: { code: 'upstream', message: 'Что-то пошло не так. Попробуйте ещё раз.' } };
+          final = fail({ code: 'upstream', message: 'Что-то пошло не так. Попробуйте ещё раз.' });
         }
       } finally {
         cancelAnimationFrame(frame);
@@ -112,7 +116,7 @@ export function useChat() {
       }
 
       const result = final;
-      patch(assistantId, (m) => ({ ...m, ...result }));
+      patch(assistantId, (m) => ({ ...m, ...result, thinking: false }));
     },
     [patch],
   );

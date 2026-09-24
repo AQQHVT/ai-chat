@@ -1,4 +1,4 @@
-export function TypingIndicator() {
+export function TypingIndicator({ thinking = false }: { thinking?: boolean }) {
   return (
     <p className="typing">
       <span className="typing-dots" aria-hidden="true">
@@ -6,7 +6,7 @@ export function TypingIndicator() {
         <span />
         <span />
       </span>
-      Модель печатает…
+      {thinking ? 'Модель думает…' : 'Модель печатает…'}
     </p>
   );
 }

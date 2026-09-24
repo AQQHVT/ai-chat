@@ -11,7 +11,7 @@ interface Props {
 }
 
 export const MessageItem = memo(function MessageItem({ message, onRetry }: Props) {
-  const { role, content, status, error } = message;
+  const { role, content, status, error, thinking, finishReason, retryAt } = message;
   const isUser = role === 'user';
   const hasText = content.trim() !== '';
 
@@ -29,7 +29,11 @@ export const MessageItem = memo(function MessageItem({ message, onRetry }: Props
           )
         )}
 
-        {status === 'streaming' && <TypingIndicator />}
+        {status === 'streaming' && <TypingIndicator thinking={thinking && !hasText} />}
+
+        {status === 'done' && finishReason === 'length' && (
+          <p className="msg-note">Ответ обрезан: модель упёрлась в лимит длины. Попросите её продолжить.</p>
+        )}
 
         {status === 'stopped' && (
           <p className="msg-note">
@@ -45,7 +49,7 @@ export const MessageItem = memo(function MessageItem({ message, onRetry }: Props
           </p>
         )}
 
-        {status === 'error' && error && <ErrorNotice error={error} onRetry={onRetry} partial={hasText} />}
+        {status === 'error' && error && <ErrorNotice error={error} retryAt={retryAt} onRetry={onRetry} partial={hasText} />}
       </article>
     </li>
   );

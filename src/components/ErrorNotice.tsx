@@ -13,13 +13,15 @@ const TITLES: Record<ErrorPayload['code'], string> = {
 
 interface Props {
   error: ErrorPayload;
+  /** Когда (epoch ms) лимит 429 должен сняться. */
+  retryAt?: number;
   /** Если есть — показываем кнопку «Повторить» (только у последнего сообщения). */
   onRetry?: () => void;
   partial: boolean;
 }
 
-export function ErrorNotice({ error, onRetry, partial }: Props) {
-  const seconds = useCountdown(error.retryAfter);
+export function ErrorNotice({ error, retryAt, onRetry, partial }: Props) {
+  const seconds = useCountdown(retryAt);
 
   return (
     <div className="notice notice--error">
@@ -44,17 +46,17 @@ export function ErrorNotice({ error, onRetry, partial }: Props) {
   );
 }
 
-function useCountdown(from?: number): number {
-  const [left, setLeft] = useState(from ?? 0);
+function useCountdown(until?: number): number {
+  const secondsLeft = () => (until ? Math.max(0, Math.ceil((until - Date.now()) / 1000)) : 0);
+  const [left, setLeft] = useState(secondsLeft);
   useEffect(() => {
-    if (!from) return;
-    const until = Date.now() + from * 1000;
+    if (!until) return;
     const id = setInterval(() => {
       const s = Math.max(0, Math.ceil((until - Date.now()) / 1000));
       setLeft(s);
       if (s === 0) clearInterval(id);
     }, 1000);
     return () => clearInterval(id);
-  }, [from]);
+  }, [until]);
   return left;
 }

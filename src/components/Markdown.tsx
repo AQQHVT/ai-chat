@@ -16,6 +16,16 @@ const components: Components = {
     </div>
   ),
   pre: ({ node: _node, ...props }) => <CodeBlock {...props} />,
+  // Картинки из ответа модели не грузим: это запрос на произвольный сторонний адрес
+  // (трекинг, утечка IP). Показываем ссылкой — открыть можно осознанно.
+  img: ({ src, alt }) =>
+    typeof src === 'string' && /^https?:/i.test(src) ? (
+      <a href={src} target="_blank" rel="noopener noreferrer">
+        [изображение{alt ? `: ${alt}` : ''}]
+      </a>
+    ) : (
+      <span>[изображение{alt ? `: ${alt}` : ''}]</span>
+    ),
 };
 
 function CodeBlock(props: ComponentPropsWithoutRef<'pre'>) {
