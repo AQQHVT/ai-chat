@@ -1,0 +1,548 @@
+/* ─── Токены ─────────────────────────────────────────────────────────────── */
+:root {
+  --bg: #f7f6f3;
+  --surface: #ffffff;
+  --surface-2: #efede8;
+  --text: #1c1b19;
+  --text-muted: #6b6860;
+  --border: #e2dfd8;
+  --accent: #3d5afe;
+  --accent-hover: #2f49e0;
+  --accent-contrast: #ffffff;
+  --user-bubble: #e6e9ff;
+  --danger: #b3261e;
+  --danger-bg: #fdecea;
+  --warn-bg: #fff4e0;
+  --warn: #7a4b00;
+  --focus: #3d5afe;
+  --code-bg: #f1efe9;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 4px 16px rgb(0 0 0 / 0.06);
+
+  --radius: 14px;
+  --radius-sm: 8px;
+  --content: 760px;
+  --gutter: 16px;
+
+  color-scheme: light;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    'Helvetica Neue',
+    Arial,
+    sans-serif;
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #16161a;
+    --surface: #1f1f24;
+    --surface-2: #2a2a31;
+    --text: #ececef;
+    --text-muted: #a0a0aa;
+    --border: #34343c;
+    --accent: #8c9eff;
+    --accent-hover: #a5b3ff;
+    --accent-contrast: #111218;
+    --user-bubble: #2c3366;
+    --danger: #ffb4ab;
+    --danger-bg: #3b1d1b;
+    --warn-bg: #3a2c12;
+    --warn: #ffd591;
+    --focus: #a5b3ff;
+    --code-bg: #26262c;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 4px 16px rgb(0 0 0 / 0.3);
+    color-scheme: dark;
+  }
+}
+
+/* ─── База ───────────────────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background: var(--bg);
+}
+
+button,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+/*
+ * Фокус. Задание просит убрать браузерный outline — мы убираем именно
+ * разнобойный браузерный вид, но не сам индикатор: без него интерфейсом
+ * невозможно пользоваться с клавиатуры (WCAG 2.4.7). Вместо этого — один
+ * одинаковый во всех браузерах outline, и только при навигации с клавиатуры
+ * (:focus-visible), так что мышью его никто не увидит. Именно outline, а не
+ * box-shadow: тени пропадают в режиме высокой контрастности Windows.
+ */
+:focus {
+  outline: none;
+}
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ─── Каркас ─────────────────────────────────────────────────────────────── */
+.app {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: color-mix(in srgb, var(--bg) 85%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
+  padding-top: env(safe-area-inset-top);
+}
+
+.app-header-inner,
+.app-main,
+.composer {
+  width: 100%;
+  max-width: var(--content);
+  margin-inline: auto;
+  padding-inline: max(var(--gutter), env(safe-area-inset-left)) max(var(--gutter), env(safe-area-inset-right));
+}
+
+.app-header-inner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+}
+
+.app-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  margin-right: auto;
+}
+
+.app-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  background: linear-gradient(to bottom, transparent, var(--bg) 24px);
+  padding-top: 24px;
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+}
+
+/* ─── Кнопки ─────────────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  font-weight: 550;
+  cursor: pointer;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s,
+    opacity 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+.btn--primary {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+.btn--primary:not(:disabled):hover {
+  background: var(--accent-hover);
+}
+.btn--ghost {
+  background: transparent;
+  border-color: var(--border);
+}
+.btn--ghost:hover {
+  background: var(--surface-2);
+}
+
+/* ─── Пустое состояние ───────────────────────────────────────────────────── */
+.empty {
+  margin-block: auto;
+  padding-block: 40px 24px;
+}
+.empty-title {
+  margin: 0 0 8px;
+  font-size: clamp(1.6rem, 5vw, 2.1rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.empty-lead {
+  margin: 0 0 24px;
+  color: var(--text-muted);
+  max-width: 56ch;
+}
+.suggestions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: 10px;
+}
+.suggestion {
+  width: 100%;
+  height: 100%;
+  text-align: left;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    transform 0.15s;
+}
+.suggestion:hover {
+  border-color: var(--accent);
+}
+.empty-note {
+  margin: 24px 0 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+/* ─── Сообщения ──────────────────────────────────────────────────────────── */
+.log {
+  padding-block: 24px 8px;
+}
+.log-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.log-end {
+  height: 1px;
+  scroll-margin-bottom: 140px;
+}
+
+.msg {
+  display: flex;
+  min-width: 0;
+}
+.msg > article {
+  min-width: 0;
+  max-width: 100%;
+}
+.msg--user {
+  justify-content: flex-end;
+}
+.msg--user > article {
+  max-width: min(85%, 600px);
+  background: var(--user-bubble);
+  padding: 10px 14px;
+  border-radius: var(--radius) var(--radius) 4px var(--radius);
+}
+.msg--assistant > article {
+  width: 100%;
+}
+
+.msg-text {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.msg--user .msg-text {
+  white-space: pre-wrap;
+}
+
+.msg-note {
+  margin: 10px 0 0;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+.msg-note--error {
+  color: var(--danger);
+  background: var(--danger-bg);
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+}
+
+/* ─── Индикатор «печатает» ───────────────────────────────────────────────── */
+.typing {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 0;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+.typing-dots {
+  display: inline-flex;
+  gap: 4px;
+}
+.typing-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: typing 1.2s infinite ease-in-out;
+}
+.typing-dots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.typing-dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes typing {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .typing-dots span {
+    animation: none;
+    opacity: 0.6;
+  }
+}
+
+/* ─── Markdown ───────────────────────────────────────────────────────────── */
+.md > :first-child {
+  margin-top: 0;
+}
+.md > :last-child {
+  margin-bottom: 0;
+}
+.md p,
+.md ul,
+.md ol,
+.md blockquote,
+.md .code-block,
+.md .md-scroll {
+  margin: 0 0 0.8em;
+}
+.md ul,
+.md ol {
+  padding-left: 1.4em;
+}
+.md li + li {
+  margin-top: 0.25em;
+}
+.md h1,
+.md h2,
+.md h3,
+.md h4 {
+  margin: 1.2em 0 0.5em;
+  line-height: 1.3;
+  font-size: 1.05rem;
+}
+.md h1 {
+  font-size: 1.25rem;
+}
+.md a {
+  color: var(--accent);
+}
+.md blockquote {
+  padding-left: 12px;
+  border-left: 3px solid var(--border);
+  color: var(--text-muted);
+}
+.md code {
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, Consolas, monospace;
+  font-size: 0.88em;
+  background: var(--code-bg);
+  padding: 0.1em 0.35em;
+  border-radius: 5px;
+}
+.md pre {
+  margin: 0;
+  padding: 14px 16px;
+  overflow-x: auto;
+  background: var(--code-bg);
+  border-radius: var(--radius-sm);
+  line-height: 1.45;
+}
+.md pre code {
+  background: none;
+  padding: 0;
+  font-size: 0.85rem;
+}
+.code-block {
+  position: relative;
+}
+.code-copy {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.code-block:hover .code-copy,
+.code-copy:focus-visible {
+  opacity: 1;
+}
+@media (hover: none) {
+  .code-copy {
+    opacity: 1;
+  }
+}
+.md-scroll {
+  overflow-x: auto;
+}
+.md table {
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+.md th,
+.md td {
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+.md th {
+  background: var(--surface-2);
+}
+.md hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 1.2em 0;
+}
+
+/* ─── Поле ввода ─────────────────────────────────────────────────────────── */
+.composer-box {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 6px 6px 6px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  box-shadow: var(--shadow);
+  transition: border-color 0.15s;
+}
+/* Кольцо фокуса рисуем на всей «капсуле» — так аккуратнее, чем рамка вокруг голого textarea. */
+.composer-box:focus-within {
+  border-color: var(--focus);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--focus) 28%, transparent),
+    var(--shadow);
+}
+@media (forced-colors: active) {
+  .composer-box:focus-within {
+    outline: 2px solid Highlight; /* тени в этом режиме не рисуются */
+  }
+}
+.composer-input {
+  flex: 1;
+  min-width: 0;
+  max-height: 40vh;
+  padding: 8px 0;
+  border: 0;
+  background: transparent;
+  resize: none;
+  line-height: 1.5;
+  /* 16px — меньше iOS Safari зумит страницу при фокусе */
+  font-size: 16px;
+}
+.composer-input:focus-visible {
+  outline: none; /* кольцо уже на .composer-box */
+}
+.composer-input::placeholder {
+  color: var(--text-muted);
+}
+.composer-btn {
+  flex-shrink: 0;
+}
+.composer-hint {
+  margin: 6px 4px 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+.composer-hint--error {
+  color: var(--danger);
+}
+kbd {
+  font-family: inherit;
+  font-size: 0.72rem;
+  padding: 1px 5px;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--surface);
+}
+
+@media (max-width: 480px) {
+  .composer-hint {
+    display: none; /* на телефоне нет физической клавиатуры — подсказка только мешает */
+  }
+  .msg--user > article {
+    max-width: 92%;
+  }
+}
+
+/* Режим высокой контрастности: гарантируем видимые границы у интерактивных элементов */
+@media (forced-colors: active) {
+  .btn,
+  .suggestion,
+  .composer-box {
+    border: 1px solid ButtonText;
+  }
+}
