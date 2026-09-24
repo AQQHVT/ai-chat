@@ -25,13 +25,13 @@ export default defineConfig({
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: [
     {
-      command: 'tsx scripts/mock-openrouter.ts',
+      command: 'npx tsx scripts/mock-openrouter.ts',
       port: MOCK_PORT,
       env: { MOCK_PORT: String(MOCK_PORT) },
       reuseExistingServer: false,
     },
     {
-      command: 'vite build && tsx server/index.ts --static',
+      command: 'npx vite build && npx tsx server/index.ts --static',
       port: APP_PORT,
       reuseExistingServer: false,
       timeout: 60_000,
