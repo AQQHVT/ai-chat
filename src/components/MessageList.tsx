@@ -4,6 +4,7 @@ import { MessageItem } from './MessageItem.tsx';
 
 interface Props {
   messages: Message[];
+  onRetry: () => void;
 }
 
 /**
@@ -11,8 +12,7 @@ interface Props {
  * Если он прокрутил вверх почитать начало ответа — не дёргаем его обратно
  * на каждом токене.
  */
-export function MessageList({ messages }: Props) {
-  const endRef = useRef<HTMLDivElement>(null);
+export function MessageList({ messages, onRetry }: Props) {
   const stickRef = useRef(true);
 
   useLayoutEffect(() => {
@@ -27,7 +27,9 @@ export function MessageList({ messages }: Props) {
   const last = messages.at(-1);
   useLayoutEffect(() => {
     // Новое сообщение пользователя — всегда показываем, иначе — только если «прилипли».
-    if (last?.role === 'user' || stickRef.current) endRef.current?.scrollIntoView({ block: 'end' });
+    // Скроллим окно до самого низа, а не элемент в видимую область: липкий футер
+    // (поле ввода, плашка «нет сети») иначе перекрывал бы конец ответа.
+    if (last?.role === 'user' || stickRef.current) window.scrollTo({ top: document.documentElement.scrollHeight });
   }, [messages.length, last?.content, last?.status, last?.role]);
 
   return (
@@ -36,11 +38,11 @@ export function MessageList({ messages }: Props) {
         Диалог
       </h2>
       <ol className="log-list">
-        {messages.map((m) => (
-          <MessageItem key={m.id} message={m} />
-        ))}
+        {messages.map((m, i) => {
+          const canRetry = i === messages.length - 1 && (m.status === 'error' || m.status === 'stopped');
+          return <MessageItem key={m.id} message={m} onRetry={canRetry ? onRetry : undefined} />;
+        })}
       </ol>
-      <div ref={endRef} className="log-end" />
     </section>
   );
 }

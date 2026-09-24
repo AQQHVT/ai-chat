@@ -4,10 +4,13 @@ import { LIMITS } from '../../shared/protocol.ts';
 interface Props {
   isStreaming: boolean;
   onSend: (text: string) => boolean;
+  onStop: () => void;
+  /** false — нет сети: печатать можно, отправлять нельзя. */
+  canSend: boolean;
   inputRef: RefObject<HTMLTextAreaElement | null>;
 }
 
-export function Composer({ isStreaming, onSend, inputRef }: Props) {
+export function Composer({ isStreaming, onSend, onStop, canSend: online, inputRef }: Props) {
   const [text, setText] = useState('');
 
   // Поле растёт вместе с текстом (до max-height в CSS), потом скроллится.
@@ -27,12 +30,14 @@ export function Composer({ isStreaming, onSend, inputRef }: Props) {
     // isComposing: Enter, подтверждающий ввод в японской/китайской раскладке, не должен отправлять.
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
-      submit();
+      // Во время генерации Enter ничего не отправляет, но и текст не теряется:
+      // можно спокойно набирать следующий вопрос.
+      if (canSend) submit();
     }
   };
 
   const tooLong = text.length > LIMITS.maxMessageChars;
-  const canSend = text.trim() !== '' && !tooLong && !isStreaming;
+  const canSend = online && text.trim() !== '' && !tooLong && !isStreaming;
 
   return (
     <form className="composer" onSubmit={submit}>
@@ -54,8 +59,25 @@ export function Composer({ isStreaming, onSend, inputRef }: Props) {
           enterKeyHint="send"
           autoComplete="off"
         />
-        <button type="submit" className="btn btn--primary composer-btn" disabled={!canSend}>
-          Отправить
+        {/*
+          Одна и та же кнопка меняет роль «Отправить» ↔ «Стоп». Это один DOM-элемент,
+          поэтому фокус с клавиатуры не теряется, когда генерация начинается/заканчивается.
+        */}
+        <button
+          type={isStreaming ? 'button' : 'submit'}
+          className={`btn composer-btn ${isStreaming ? 'btn--stop' : 'btn--primary'}`}
+          onClick={isStreaming ? onStop : undefined}
+          disabled={!isStreaming && !canSend}
+          aria-keyshortcuts={isStreaming ? 'Escape' : undefined}
+        >
+          {isStreaming ? (
+            <>
+              <span className="stop-icon" aria-hidden="true" />
+              Стоп
+            </>
+          ) : (
+            'Отправить'
+          )}
         </button>
       </div>
       <p id="composer-hint" className="composer-hint">
@@ -64,9 +86,15 @@ export function Composer({ isStreaming, onSend, inputRef }: Props) {
             Слишком длинно: {text.length} из {LIMITS.maxMessageChars} символов
           </span>
         ) : (
-          <>
-            <kbd>Enter</kbd> — отправить, <kbd>Shift</kbd>+<kbd>Enter</kbd> — новая строка
-          </>
+          isStreaming ? (
+            <>
+              <kbd>Esc</kbd> — остановить генерацию
+            </>
+          ) : (
+            <>
+              <kbd>Enter</kbd> — отправить, <kbd>Shift</kbd>+<kbd>Enter</kbd> — новая строка
+            </>
+          )
         )}
       </p>
     </form>

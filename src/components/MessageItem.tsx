@@ -1,15 +1,19 @@
 import { memo } from 'react';
 import type { Message } from '../types.ts';
+import { ErrorNotice } from './ErrorNotice.tsx';
 import { Markdown } from './Markdown.tsx';
 import { TypingIndicator } from './TypingIndicator.tsx';
 
 interface Props {
   message: Message;
+  /** Передаётся только последнему сообщению модели — повторять старые ответы бессмысленно. */
+  onRetry?: () => void;
 }
 
-export const MessageItem = memo(function MessageItem({ message }: Props) {
+export const MessageItem = memo(function MessageItem({ message, onRetry }: Props) {
   const { role, content, status, error } = message;
   const isUser = role === 'user';
+  const hasText = content.trim() !== '';
 
   return (
     <li className={`msg msg--${role}`}>
@@ -18,7 +22,7 @@ export const MessageItem = memo(function MessageItem({ message }: Props) {
         {isUser ? (
           <p className="msg-text">{content}</p>
         ) : (
-          content && (
+          hasText && (
             <div className="msg-text md">
               <Markdown text={content} />
             </div>
@@ -27,9 +31,21 @@ export const MessageItem = memo(function MessageItem({ message }: Props) {
 
         {status === 'streaming' && <TypingIndicator />}
 
-        {status === 'error' && error && (
-          <p className="msg-note msg-note--error">{error.message}</p>
+        {status === 'stopped' && (
+          <p className="msg-note">
+            {hasText ? 'Генерация остановлена.' : 'Остановлено до начала ответа.'}
+            {onRetry && (
+              <>
+                {' '}
+                <button type="button" className="link-btn" onClick={onRetry}>
+                  Сгенерировать заново
+                </button>
+              </>
+            )}
+          </p>
         )}
+
+        {status === 'error' && error && <ErrorNotice error={error} onRetry={onRetry} partial={hasText} />}
       </article>
     </li>
   );
