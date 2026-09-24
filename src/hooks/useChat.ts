@@ -9,23 +9,45 @@ const uid = () => crypto.randomUUID();
 const toDTO = (messages: Message[]): ChatMessageDTO[] =>
   messages.filter((m) => m.content.trim() !== '').map(({ role, content }) => ({ role, content }));
 
+/** Почему оборвали запрос — от этого зависит, что увидит пользователь. */
+type AbortReason = 'user' | 'offline' | 'reset';
+
 export function useChat() {
   const [messages, setMessages] = useState<Message[]>(loadHistory);
   const controllerRef = useRef<AbortController | null>(null);
   const isStreaming = messages.some((m) => m.status === 'streaming');
 
-  // Во время стрима пишем в хранилище не чаще раза в секунду, в остальное время — сразу.
+  // Сохранение. Вне стрима — сразу. Во время стрима — не чаще раза в секунду
+  // (throttle, а не debounce: токены идут непрерывно, и debounce-таймер
+  // перезапускался бы бесконечно, так ничего и не сохранив до конца ответа).
+  const latest = useRef(messages);
+  const lastSave = useRef(0);
   useEffect(() => {
-    if (!isStreaming) {
+    latest.current = messages;
+    const now = Date.now();
+    if (!isStreaming || now - lastSave.current >= 1000) {
+      lastSave.current = now;
       saveHistory(messages);
-      return;
     }
-    const t = setTimeout(() => saveHistory(messages), 1000);
-    return () => clearTimeout(t);
   }, [messages, isStreaming]);
 
+  // Перезагрузка/закрытие посреди ответа: дописываем самое свежее состояние.
+  useEffect(() => {
+    const onHide = () => saveHistory(latest.current);
+    window.addEventListener('pagehide', onHide);
+    return () => window.removeEventListener('pagehide', onHide);
+  }, []);
+
   // Уходим со страницы/размонтируемся — обрываем запрос, чтобы сервер отменил генерацию.
-  useEffect(() => () => controllerRef.current?.abort(), []);
+  useEffect(() => () => controllerRef.current?.abort('reset' satisfies AbortReason), []);
+
+  // Браузер сообщил, что сеть пропала. fetch в таком случае может «висеть»
+  // десятки секунд, прежде чем упасть сам, — не заставляем человека ждать.
+  useEffect(() => {
+    const onOffline = () => controllerRef.current?.abort('offline' satisfies AbortReason);
+    window.addEventListener('offline', onOffline);
+    return () => window.removeEventListener('offline', onOffline);
+  }, []);
 
   const patch = useCallback((id: string, fn: (m: Message) => Message) => {
     setMessages((prev) => prev.map((m) => (m.id === id ? fn(m) : m)));
@@ -36,7 +58,7 @@ export function useChat() {
       const assistantId = uid();
       setMessages([...history, { id: assistantId, role: 'assistant', content: '', status: 'streaming' }]);
 
-      controllerRef.current?.abort();
+      controllerRef.current?.abort('reset' satisfies AbortReason);
       const controller = new AbortController();
       controllerRef.current = controller;
 
@@ -72,9 +94,17 @@ export function useChat() {
           error: { code: 'network', message: 'Ответ оборвался, не дойдя до конца.' },
         };
       } catch (err) {
-        if (controller.signal.aborted) final = { status: 'stopped' };
-        else if (err instanceof ChatError) final = { status: 'error', error: err.payload };
-        else final = { status: 'error', error: { code: 'upstream', message: 'Что-то пошло не так. Попробуйте ещё раз.' } };
+        const reason = controller.signal.reason as AbortReason | undefined;
+        if (controller.signal.aborted && reason === 'offline') {
+          final = { status: 'error', error: { code: 'network', message: 'Пропало подключение к интернету.' } };
+        } else if (controller.signal.aborted) {
+          final = { status: 'stopped' };
+        } else if (err instanceof ChatError) {
+          final = { status: 'error', error: err.payload };
+        } else {
+          console.error(err);
+          final = { status: 'error', error: { code: 'upstream', message: 'Что-то пошло не так. Попробуйте ещё раз.' } };
+        }
       } finally {
         cancelAnimationFrame(frame);
         flush(); // не теряем хвост, пришедший в последнем кадре
@@ -97,10 +127,23 @@ export function useChat() {
     [messages, isStreaming, run],
   );
 
+  /** Стоп: обрываем запрос. Уже полученный текст остаётся в истории со статусом «остановлено». */
+  const stop = useCallback(() => {
+    controllerRef.current?.abort('user' satisfies AbortReason);
+  }, []);
+
+  /** Повтор последнего ответа: убираем неудачную реплику модели и спрашиваем заново. */
+  const retry = useCallback(() => {
+    if (isStreaming) return;
+    const last = messages.at(-1);
+    if (last?.role !== 'assistant') return;
+    void run(messages.slice(0, -1));
+  }, [messages, isStreaming, run]);
+
   const reset = useCallback(() => {
-    controllerRef.current?.abort();
+    controllerRef.current?.abort('reset' satisfies AbortReason);
     setMessages([]);
   }, []);
 
-  return { messages, isStreaming, send, reset };
+  return { messages, isStreaming, send, stop, retry, reset };
 }
