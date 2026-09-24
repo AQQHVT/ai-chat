@@ -53,7 +53,7 @@ export function Composer({ isStreaming, onSend, onStop, canSend: online, inputRe
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={onKeyDown}
-          placeholder="Напишите сообщение…"
+          placeholder="Сообщение…"
           aria-describedby="composer-hint"
           aria-invalid={tooLong || undefined}
           enterKeyHint="send"

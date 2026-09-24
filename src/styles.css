@@ -506,6 +506,9 @@ textarea {
   .code-copy {
     opacity: 1;
   }
+  .md pre {
+    padding-top: 36px; /* кнопка видна всегда — не даём ей закрывать первую строку кода */
+  }
 }
 .md-scroll {
   overflow-x: auto;
