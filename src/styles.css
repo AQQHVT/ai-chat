@@ -206,6 +206,35 @@ textarea {
   background: var(--surface-2);
 }
 
+.btn--sm {
+  min-height: 34px;
+  padding: 0 12px;
+  font-size: 0.875rem;
+}
+.btn--stop {
+  background: var(--text);
+  color: var(--bg);
+}
+.btn--stop:hover {
+  opacity: 0.85;
+}
+.stop-icon {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: currentColor;
+}
+.link-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  font-size: inherit;
+}
+
 /* ─── Пустое состояние ───────────────────────────────────────────────────── */
 .empty {
   margin-block: auto;
@@ -264,10 +293,6 @@ textarea {
   flex-direction: column;
   gap: 20px;
 }
-.log-end {
-  height: 1px;
-  scroll-margin-bottom: 140px;
-}
 
 .msg {
   display: flex;
@@ -303,10 +328,50 @@ textarea {
   font-size: 0.9rem;
   color: var(--text-muted);
 }
-.msg-note--error {
-  color: var(--danger);
+
+/* ─── Уведомления об ошибках ─────────────────────────────────────────────── */
+.notice {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+}
+.notice--error {
   background: var(--danger-bg);
-  padding: 10px 12px;
+  border-color: color-mix(in srgb, var(--danger) 25%, transparent);
+}
+.notice-title {
+  margin: 0 0 2px;
+  font-weight: 650;
+  color: var(--danger);
+}
+.notice-text {
+  margin: 0;
+  font-size: 0.93rem;
+}
+.notice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 10px;
+}
+.notice-actions .btn--ghost {
+  background: var(--surface);
+}
+.notice-hint {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.offline {
+  width: min(var(--content) - 2 * var(--gutter), 100% - 2 * var(--gutter));
+  margin: 0 auto 8px;
+  padding: 8px 12px;
+  font-size: 0.875rem;
+  text-align: center;
+  color: var(--warn);
+  background: var(--warn-bg);
   border-radius: var(--radius-sm);
 }
 
@@ -440,6 +505,9 @@ textarea {
 @media (hover: none) {
   .code-copy {
     opacity: 1;
+  }
+  .md pre {
+    padding-top: 36px; /* кнопка видна всегда — не даём ей закрывать первую строку кода */
   }
 }
 .md-scroll {

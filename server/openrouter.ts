@@ -92,43 +92,62 @@ export async function openChatStream(
     let gotDone = false;
     let gotAnyText = false;
     let sentMeta = false;
+    let lastThinkingAt = 0;
+
+    /** Разбирает одно SSE-событие OpenRouter. Возвращает true, если поток надо закончить. */
+    function* handle(data: string): Generator<StreamEvent, boolean> {
+      if (data === '[DONE]') {
+        gotDone = true;
+        return false;
+      }
+      let json: OpenRouterChunk;
+      try {
+        json = JSON.parse(data) as OpenRouterChunk;
+      } catch {
+        return false; // битый чанк — пропускаем, не роняем весь ответ
+      }
+
+      if (json.model && !sentMeta) {
+        sentMeta = true; // какая модель реально отвечает (важно при фолбэке `models`)
+        yield { type: 'meta', model: json.model };
+      }
+
+      if (json.error) {
+        // Ошибка провайдера посреди потока: HTTP 200 от OpenRouter уже пришёл.
+        yield { type: 'error', ...mapUpstreamError(json.error.code, json.error.message) };
+        return true;
+      }
+
+      const choice = json.choices?.[0];
+      const text = choice?.delta?.content;
+      if (text) {
+        gotAnyText = true;
+        resetTimer(config.idleTimeoutMs);
+        yield { type: 'delta', text };
+      } else if (choice?.delta?.reasoning) {
+        // Reasoning-модели (Qwen, GLM, Nemotron…) сначала долго «думают» и шлют
+        // reasoning вместо content. Это признак жизни: не роняем их по таймауту
+        // первого токена и раз в несколько секунд сообщаем клиенту «модель думает».
+        resetTimer(config.idleTimeoutMs);
+        const now = Date.now();
+        if (now - lastThinkingAt > 5_000) {
+          lastThinkingAt = now;
+          yield { type: 'thinking' };
+        }
+      }
+      if (choice?.finish_reason) finishReason = choice.finish_reason;
+      return false;
+    }
 
     try {
       for await (const chunk of stream) {
         for (const data of parser.push(decoder.decode(chunk, { stream: true }))) {
-          if (data === '[DONE]') {
-            gotDone = true;
-            continue;
-          }
-          let json: OpenRouterChunk;
-          try {
-            json = JSON.parse(data) as OpenRouterChunk;
-          } catch {
-            continue; // битый чанк — пропускаем, не роняем весь ответ
-          }
-
-          if (json.model && !sentMeta) {
-            sentMeta = true; // какая модель реально отвечает (важно при фолбэке `models`)
-            yield { type: 'meta', model: json.model };
-          }
-
-          if (json.error) {
-            // Ошибка провайдера посреди потока: HTTP 200 уже ушёл, сообщаем событием.
-            yield { type: 'error', ...mapUpstreamError(json.error.code, json.error.message) };
-            return;
-          }
-
-          const choice = json.choices?.[0];
-          const text = choice?.delta?.content;
-          if (text) {
-            gotAnyText = true;
-            resetTimer(config.idleTimeoutMs);
-            yield { type: 'delta', text };
-          }
-          if (choice?.finish_reason) finishReason = choice.finish_reason;
+          if (yield* handle(data)) return;
         }
       }
-      parser.flush();
+      for (const data of parser.flush()) {
+        if (yield* handle(data)) return;
+      }
     } catch {
       if (abortCause === 'client') return; // клиент ушёл — писать уже некому
       if (abortCause === 'timeout') {
@@ -149,6 +168,11 @@ export async function openChatStream(
       yield { type: 'error', code: 'network', message: 'Ответ модели оборвался, не дойдя до конца.' };
       return;
     }
+    if (!gotAnyText) {
+      // Бывает у бесплатных моделей под нагрузкой: поток закрылся штатно, но пустой.
+      yield { type: 'error', code: 'upstream', message: 'Модель вернула пустой ответ. Попробуйте ещё раз.' };
+      return;
+    }
     yield { type: 'done', finishReason };
   }
 
@@ -158,7 +182,10 @@ export async function openChatStream(
 interface OpenRouterChunk {
   model?: string;
   error?: { code?: number | string; message?: string };
-  choices?: Array<{ delta?: { content?: string | null }; finish_reason?: string | null }>;
+  choices?: Array<{
+    delta?: { content?: string | null; reasoning?: string | null };
+    finish_reason?: string | null;
+  }>;
 }
 
 function timeoutError(midStream = false): ErrorPayload {

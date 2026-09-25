@@ -42,6 +42,8 @@ export interface ErrorBody {
 
 export type StreamEvent =
   | { type: 'meta'; model: string }
+  /** Reasoning-модель «думает»: текста ещё нет, но модель жива. */
+  | { type: 'thinking' }
   | { type: 'delta'; text: string }
   | { type: 'done'; finishReason: string | null }
   | ({ type: 'error' } & ErrorPayload);

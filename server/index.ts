@@ -172,6 +172,12 @@ async function handleStatic(pathname: string, res: ServerResponse) {
   }
   const ext = path.extname(file);
   res.writeHead(200, {
+    // Страница ходит только на свой origin; даже если в ответ модели как-то попадёт
+    // разметка, внешние скрипты и запросы браузер не выполнит.
+    'Content-Security-Policy':
+      "default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'no-referrer',
     'Content-Type': MIME[ext] ?? 'application/octet-stream',
     'Cache-Control': file.includes(`${path.sep}assets${path.sep}`) ? 'public, max-age=31536000, immutable' : 'no-cache',
   });

@@ -18,19 +18,54 @@ export class ChatError extends Error {
  * без тела и не отменяется через AbortController. Здесь POST с историей и
  * честная отмена одной строчкой `controller.abort()`.
  */
+/**
+ * Сторож на клиенте. Основные таймауты живут на сервере (45 с до первого токена,
+ * 30 с между токенами) и приходят к нам нормальной ошибкой. Этот нужен на случай,
+ * когда до нас не доходит вообще ничего: сервер завис, соединение «повисло» без
+ * разрыва (мобильная сеть, спящий ноутбук). Поэтому он заметно длиннее серверных.
+ */
+const CLIENT_SILENCE_TIMEOUT_MS = 60_000;
+
 export async function* streamChat(messages: ChatMessageDTO[], signal: AbortSignal): AsyncGenerator<StreamEvent> {
+  const watchdog = new AbortController();
+  let timer = setTimeout(() => watchdog.abort(), CLIENT_SILENCE_TIMEOUT_MS);
+  const kick = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => watchdog.abort(), CLIENT_SILENCE_TIMEOUT_MS);
+  };
+  const combined = AbortSignal.any([signal, watchdog.signal]);
+  const failure = (network: ErrorPayload): ChatError =>
+    watchdog.signal.aborted
+      ? new ChatError({ code: 'timeout', message: 'Сервер слишком долго молчит. Попробуйте ещё раз.' })
+      : new ChatError(network);
+
+  try {
+    yield* read(messages, signal, combined, kick, failure);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function* read(
+  messages: ChatMessageDTO[],
+  signal: AbortSignal,
+  combined: AbortSignal,
+  kick: () => void,
+  failure: (network: ErrorPayload) => ChatError,
+): AsyncGenerator<StreamEvent> {
   let res: Response;
   try {
     res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ messages }),
-      signal,
+      signal: combined,
     });
   } catch (err) {
-    if (signal.aborted) throw err;
-    throw new ChatError({ code: 'network', message: 'Нет связи с сервером. Проверьте подключение к интернету.' });
+    if (signal.aborted) throw err; // отмена пользователем — пробрасываем как есть
+    throw failure({ code: 'network', message: 'Нет связи с сервером. Проверьте подключение к интернету.' });
   }
+  kick();
 
   if (!res.ok || !res.body) throw new ChatError(await readError(res));
 
@@ -43,9 +78,10 @@ export async function* streamChat(messages: ChatMessageDTO[], signal: AbortSigna
         chunk = await reader.read();
       } catch (err) {
         if (signal.aborted) throw err;
-        throw new ChatError({ code: 'network', message: 'Соединение с сервером оборвалось посреди ответа.' });
+        throw failure({ code: 'network', message: 'Соединение с сервером оборвалось посреди ответа.' });
       }
       if (chunk.done) break;
+      kick();
       buffer += chunk.value;
       let nl: number;
       while ((nl = buffer.indexOf('\n')) !== -1) {

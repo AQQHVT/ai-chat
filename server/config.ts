@@ -4,7 +4,7 @@ const int = (name: string, fallback: number): number => {
   return Number.isFinite(n) && n > 0 ? n : fallback;
 };
 
-const models = (process.env.OPENROUTER_MODEL ?? 'meta-llama/llama-3.3-70b-instruct:free')
+const models = (process.env.OPENROUTER_MODEL || 'google/gemma-4-31b-it:free,z-ai/glm-5.2:free,qwen/qwen3.8-27b:free')
   .split(',')
   .map((m) => m.trim())
   .filter(Boolean);

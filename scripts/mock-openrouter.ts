@@ -11,6 +11,9 @@
  *   «обрыв»    → несколько токенов, затем разрыв TCP-соединения
  *   «ошибка»   → ошибка провайдера внутри потока (HTTP 200 уже отправлен)
  *   «404»      → модель не найдена
+ *   «думай»    → reasoning-модель: 3 с шлёт только reasoning, потом отвечает
+ *   «пусто»    → поток закрывается штатно, но без текста
+ *   «длинно»   → ответ обрывается с finish_reason: "length"
  *   всё прочее → длинный markdown-ответ по слову раз в 40 мс
  */
 import http from 'node:http';
@@ -45,6 +48,9 @@ async function fetchWithTimeout(url: string, ms: number) {
 | Отмена | Уже полученный кусок текста |
 
 Если нужно, могу показать тот же пример с повторными попытками и экспоненциальной задержкой.`;
+
+const reasoning = (text: string) =>
+  `data: ${JSON.stringify({ model: 'mock/qwen:free', choices: [{ delta: { content: '', reasoning: text }, finish_reason: null }] })}\n\n`;
 
 const chunk = (content: string, finish: string | null = null) =>
   `data: ${JSON.stringify({ model: 'mock/llama:free', choices: [{ delta: { content }, finish_reason: finish }] })}\n\n`;
@@ -82,6 +88,17 @@ http
       return;
     }
 
+    if (last.includes('пусто')) {
+      res.write(chunk('', 'stop'));
+      return res.end('data: [DONE]\n\n');
+    }
+    if (last.includes('думай')) {
+      for (let i = 0; i < 30 && !closed; i++) {
+        res.write(reasoning('размышляю… '));
+        await sleep(100);
+      }
+    }
+
     const words = ANSWER.split(/(?<=\s)/);
     for (let i = 0; i < words.length && !closed; i++) {
       if (last.includes('обрыв') && i === 25) return res.socket?.destroy();
@@ -92,6 +109,10 @@ http
       if (last.includes('ошибка') && i === 25) {
         res.write(`data: ${JSON.stringify({ error: { code: 502, message: 'Provider returned error' }, choices: [{ delta: { content: '' }, finish_reason: 'error' }] })}\n\n`);
         return res.end();
+      }
+      if (last.includes('длинно') && i === 40) {
+        res.write(chunk('', 'length'));
+        return res.end('data: [DONE]\n\n');
       }
       res.write(chunk(words[i]));
       await sleep(40);
